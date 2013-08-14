@@ -48,7 +48,7 @@ module Graphics.EasyPlot (
     Plot (plot, plot'),
 
     -- * Graphs for 2D and 3D plots
-    Graph2D (..), Graph3D (..),
+    Graph2D (..), TimeGraph2D (..), Graph3D (..),
 
     -- * Configuration and other options
     TerminalType (..),
@@ -104,6 +104,7 @@ data Style2D = Boxerrorbars | Boxes | Boxyerrorbars
 data Option = Style Style   -- ^ The style for a graph.
             | Title String  -- ^ The title for a graph in a plot (or a filename like @plot1.dat@).
             | Color Color   -- ^ The line-color for the graph (or if it consist of 'Dots' or 'Points' the color of these)
+            | XTime Bool
 
 -- | Options which are exclusively available for 2D plots.
 data Option2D x y = Range x x -- ^ Plots the function for the specified x range
@@ -283,12 +284,15 @@ sanitize = sortBy ord . nubBy dup
             ord' (Style _) (Title _) = LT
             ord' (Style _) (Color _) = LT
             ord' (Color _) (Title _) = GT
+            -- Makes XTime option come first (last?)
+            ord' (XTime _) _ = LT
             ord' a b
                 | ord' b a == LT = GT
                 | True           = LT
             dup (Title _) (Title _) = True
             dup (Style _) (Style _) = True
             dup (Color _) (Color _) = True
+            dup (XTime _) (XTime _) = True
             dup _ _                 = False
 
 -- | INTERNAL: Translates options into gnuplot commands
@@ -357,6 +361,7 @@ instance GnuplotIdiom Option where
         Title t -> "title \"" ++ t ++ "\""
         Style s -> toString s
         Color c -> "lc rgb \"" ++ toString c ++ "\""
+        XTime b -> if b==True then "using 1:2" else " "
 
 instance GnuplotIdiom x => GnuplotIdiom [x] where
     toString = unlines . map toString
@@ -416,16 +421,17 @@ toGnuplotDateString d = formatTime defaultTimeLocale "%Y%m%d" d
   -- toString (d, x) = (toGnuplotDateString d) ++ " " ++ (show x)
 
 printDateTuple :: (Num x, Show x) => (Day, x) -> String
-printDateTuple (d, x) = (toGnuplotDateString d) ++ " " ++ (show x)
+printDateTuple (d, x) = "\n" ++ (toGnuplotDateString d) ++ " " ++ (show x)
 
 data TimeGraph2D t x = 
       TimeData2D [Option] [Option2D t x] [(t,x)]
 
--- TODO: make this work
 instance (Num x, Show x) => Plot [TimeGraph2D Day x] where
-  plot' options term graphs = exec options [toString term] "plot" options' datasources
+  plot' options term graphs = exec options [toString term] "set xdata time; set timefmt '%Y%m%d'; plot" options' datasources
         where   (options', datasources) = unzip $ map prepare graphs
                 prepare (TimeData2D  opt opt2d g) = 
-                  (opts $ sanitize opt, Left $ concat $ map printDateTuple g)
+                  (opts $ sanitize opt, 
+                   Left $ concat $ map printDateTuple g)
+-- Something is funny here... TODO figure out this concat crap
 
 -- next: make "prepare" apply to a TimeGraph2D

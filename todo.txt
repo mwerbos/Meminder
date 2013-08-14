@@ -1,5 +1,9 @@
 HIGH PRIORITY:
 Add (or find) ability to graph dates to EasyPlot
+++ Make TimeGraph2D force the "timefmt" options (check if this works)
+
+Make package for my fork of EasyPlot
+Install my fork of EasyPlot and test it out
+
 Add ability to add goal lines
 Make the ability to have more than one table of things
-
