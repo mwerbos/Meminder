@@ -1,4 +1,4 @@
--- TODO: Modify Easyplot to do time formatting??
+-- TODO make fork of EasyPlot more obviously a fork
 import Graphics.EasyPlot
 import Data.Time.Clock
 import Data.Time.Calendar
@@ -8,8 +8,6 @@ import Database.HDBC
 import Database.HDBC.Sqlite3
 import System.Environment
 
--- type ReviewRow = [[Row Int],[Row String],[Row Double]]
-
 main = do
   args <- getArgs
   let Just command = (lookup (head args) commands)
@@ -17,24 +15,33 @@ main = do
 
 -- Takes the arguments and does an action block based on it
 commands :: [(String, [String] -> IO () )]
-commands = [("add", doAddToTable),
-            ("show", doShowTable),
-            ("create", doCreateTable),
-            ("init", doInitDatabase)
+commands = [("add", addToTable),
+            ("show", showTable),
+            ("create", createTable),
+            ("init", initDatabase),
+            ("list", listTables)
             ]
 
-doInitDatabase :: [String] -> IO ()
--- TODO: Implement this function
--- using tracking_master table
-doInitDatabase _ = do
+initDatabase :: [String] -> IO ()
+initDatabase _ = do
   -- TODO make sure this works even if the file doesn't exist yet
   db <- connectSqlite3 "tracking.sqlite3"
   run db "create table tracking_master (name STRING, x_intercept DATE, per_day FLOAT);" []
   commit db
   return ()
 
-doCreateTable :: [String] -> IO ()
-doCreateTable [tableName] = do
+listTables :: [String] -> IO ()
+listTables _ = do
+  db <- connectSqlite3 "tracking.sqlite3"
+  r <- quickQuery' db ("select * from tracking_master") []
+  putStrLn "The following items are being tracked in the database:"
+  mapM putStrLn (getNames r)
+  return ()
+  where getNames rowList = map getName rowList
+        getName (name:_) = (fromSql name) :: String
+
+createTable :: [String] -> IO ()
+createTable [tableName] = do
   -- TODO: use tracking_master table to also add intercept line
   db <- connectSqlite3 "tracking.sqlite3"
   run db ("create table " ++ tableName ++ " (id INTEGER PRIMARY KEY, date DATE, amt FLOAT, to_date FLOAT);") []
@@ -45,8 +52,8 @@ doCreateTable [tableName] = do
   -- TODO: Add confirmation or error message
   return ()
 
-doShowTable :: [String] -> IO ()
-doShowTable args = do
+showTable :: [String] -> IO ()
+showTable args = do
   -- TODO: use tracking_master table to show desired line
   -- (and margins of error?)
   db <- connectSqlite3 "tracking.sqlite3"
@@ -55,13 +62,13 @@ doShowTable args = do
   plot' [Debug] X11 $ [TimeData2D [Title "Reviews", XTime True] [] (getDateAmountTuples t r) ]
   return ()
 
-doShowReviews :: [String] -> IO ()
-doShowReviews _ = doShowTable ["reviews"]
+showReviews :: [String] -> IO ()
+showReviews _ = showTable ["reviews"]
 
 -- Takes the rest of the args
 -- and adds a review based on them.
-doAddToTable :: [String] -> IO ()
-doAddToTable [tableName, dateString, amtString] = do
+addToTable :: [String] -> IO ()
+addToTable [tableName, dateString, amtString] = do
   db <- connectSqlite3 "tracking.sqlite3"
   t <- today
   let date = if dateString == "t"
@@ -85,7 +92,7 @@ getDateAmountTuples :: Day -> [[SqlValue]] -> [(Day,Double)]
 getDateAmountTuples defaultDay list = map (getDateAmountTuple defaultDay) list
 
 getDateAmountTuple :: Day -> [SqlValue] -> (Day, Double)
--- List should be ID, date, amt, to_date
+-- List should be ID, date, amt, to_datet
 getDateAmountTuple defaultDay [a,b,c,d] = ( (fromSql b) :: Day, (fromSql c) :: Double)
 getDateAmountTuple defaultDay _ = (defaultDay, 0.0 )
 
